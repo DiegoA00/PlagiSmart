@@ -83,10 +83,41 @@ export const authService = {
         password
       });
 
-      if (!authResponse.success || !authResponse.data || !authResponse.data.token) {
+      if (!authResponse.success) {
+        // Manejar errores específicos de autenticación
+        let errorMessage = 'Error al iniciar sesión';
+        
+        if (authResponse.message) {
+          // Buscar mensajes específicos de credenciales incorrectas
+          const lowerMessage = authResponse.message.toLowerCase();
+          if (lowerMessage.includes('bad credentials') || 
+              lowerMessage.includes('invalid credentials') ||
+              lowerMessage.includes('credenciales inválidas') ||
+              lowerMessage.includes('usuario no encontrado') ||
+              lowerMessage.includes('contraseña incorrecta') ||
+              lowerMessage.includes('email o contraseña incorrectos')) {
+            errorMessage = 'Correo electrónico o contraseña incorrectos';
+          } else if (lowerMessage.includes('unauthorized') || 
+                     lowerMessage.includes('no autorizado')) {
+            errorMessage = 'Credenciales incorrectas';
+          } else if (lowerMessage.includes('timeout') || 
+                     lowerMessage.includes('connection')) {
+            errorMessage = 'Error de conexión. Verifique su conexión a internet';
+          } else {
+            errorMessage = authResponse.message;
+          }
+        }
+        
         return {
           success: false,
-          message: authResponse.message || 'Token no recibido del servidor'
+          message: errorMessage
+        };
+      }
+
+      if (!authResponse.data || !authResponse.data.token) {
+        return {
+          success: false,
+          message: 'No se recibió el token de autenticación'
         };
       }
 
@@ -102,55 +133,85 @@ export const authService = {
       console.log('===========================');
 
       // Segunda llamada: obtener datos del usuario usando el token
-      const userResponse = await fetch(`${apiService.baseURL}/users/me`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `${tokenType || 'Bearer'} ${token}`
-        }
-      });
+      try {
+        const userResponse = await fetch(`${apiService.baseURL}/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `${tokenType || 'Bearer'} ${token}`
+          }
+        });
 
-      if (!userResponse.ok) {
-        const errorText = await userResponse.text();
-        console.error('User data fetch error:', errorText);
+        if (!userResponse.ok) {
+          const errorText = await userResponse.text();
+          console.error('User data fetch error:', errorText);
+          return {
+            success: false,
+            message: 'Error al obtener datos del usuario. Inténtelo nuevamente.'
+          };
+        }
+
+        const userData = await userResponse.json();
+        console.log('User data received:', userData);
+
+        // Store the complete authorization header like web does
+        // The web stores the full "Bearer token" string in auth_token
+        const authHeader = `${tokenType || 'Bearer'} ${token}`.trim().replace(/\s+/g, ' ');
+        await AsyncStorage.setItem('auth_token', authHeader);
+        await AsyncStorage.setItem('token_type', (tokenType || 'Bearer').trim());
+        await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+        
+        // Verificar que se guardó correctamente
+        const savedToken = await AsyncStorage.getItem('auth_token');
+        const savedUserData = await AsyncStorage.getItem('user_data');
+        
+        console.log('=== LOGIN VERIFICATION ===');
+        console.log('Token saved successfully:', !!savedToken);
+        console.log('User data saved successfully:', !!savedUserData);
+        console.log('Saved token preview:', savedToken ? savedToken.substring(0, 30) + '...' : 'NULL');
+        console.log('=========================');
+
+        return {
+          success: true,
+          data: {
+            token,
+            user: userData
+          }
+        };
+      } catch (userError: any) {
+        console.error('Error fetching user data:', userError);
         return {
           success: false,
-          message: `Error al obtener datos del usuario: ${userResponse.status}`
+          message: 'Error al obtener datos del usuario. Inténtelo nuevamente.'
         };
       }
-
-      const userData = await userResponse.json();
-      console.log('User data received:', userData);
-
-      // Store the complete authorization header like web does
-      // The web stores the full "Bearer token" string in auth_token
-      const authHeader = `${tokenType || 'Bearer'} ${token}`.trim().replace(/\s+/g, ' ');
-      await AsyncStorage.setItem('auth_token', authHeader);
-      await AsyncStorage.setItem('token_type', (tokenType || 'Bearer').trim());
-      await AsyncStorage.setItem('user_data', JSON.stringify(userData));
-      
-      // Verificar que se guardó correctamente
-      const savedToken = await AsyncStorage.getItem('auth_token');
-      const savedUserData = await AsyncStorage.getItem('user_data');
-      
-      console.log('=== LOGIN VERIFICATION ===');
-      console.log('Token saved successfully:', !!savedToken);
-      console.log('User data saved successfully:', !!savedUserData);
-      console.log('Saved token preview:', savedToken ? savedToken.substring(0, 30) + '...' : 'NULL');
-      console.log('=========================');
-
-      return {
-        success: true,
-        data: {
-          token,
-          user: userData
-        }
-      };
     } catch (error: any) {
       console.error('Login error:', error);
+      
+      // Manejar errores específicos de red
+      let errorMessage = 'Error de conexión';
+      
+      if (error.message) {
+        const lowerMessage = error.message.toLowerCase();
+        if (lowerMessage.includes('network') || 
+            lowerMessage.includes('fetch') ||
+            lowerMessage.includes('timeout') ||
+            lowerMessage.includes('abort')) {
+          errorMessage = 'Error de conexión. Verifique su conexión a internet';
+        } else if (lowerMessage.includes('unauthorized') || 
+                   lowerMessage.includes('401')) {
+          errorMessage = 'Correo electrónico o contraseña incorrectos';
+        } else if (lowerMessage.includes('bad credentials') || 
+                   lowerMessage.includes('invalid credentials')) {
+          errorMessage = 'Credenciales incorrectas';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return {
         success: false,
-        message: error.message || 'Error de conexión'
+        message: errorMessage
       };
     }
   }

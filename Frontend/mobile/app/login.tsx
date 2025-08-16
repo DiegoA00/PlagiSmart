@@ -14,12 +14,14 @@ import {
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { authService } from '@/services/auth/loginService';
+import { useNetworkError } from '@/hooks/useNetworkError';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { handleAndShowError } = useNetworkError();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -85,11 +87,22 @@ export default function LoginScreen() {
         }
       } else {
         console.log('Login failed:', result.message);
-        Alert.alert('Error', result.message || 'Error al iniciar sesión');
+        // Usar el hook de manejo de errores
+        handleAndShowError(
+          new Error(result.message || 'Error al iniciar sesión'),
+          undefined,
+          () => setPassword('') // Limpiar contraseña en caso de error
+        );
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Error', error.message || 'Error de conexión');
+      
+      // Usar el hook de manejo de errores
+      handleAndShowError(
+        error,
+        undefined,
+        () => setPassword('') // Limpiar contraseña en caso de error
+      );
     } finally {
       setLoading(false);
     }

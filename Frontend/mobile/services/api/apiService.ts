@@ -95,7 +95,28 @@ class ApiService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        
+        // Manejar errores específicos de autenticación
+        if (response.status === 401) {
+          throw new Error('Credenciales incorrectas');
+        } else if (response.status === 400) {
+          // Intentar parsear el error para obtener un mensaje más específico
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.message) {
+              throw new Error(errorData.message);
+            }
+          } catch (parseError) {
+            // Si no se puede parsear, usar el texto original
+          }
+          throw new Error('Datos de entrada incorrectos');
+        } else if (response.status === 500) {
+          throw new Error('Error interno del servidor');
+        } else if (response.status >= 500) {
+          throw new Error('Error del servidor. Inténtelo más tarde');
+        } else {
+          throw new Error(`Error del servidor: ${response.status}`);
+        }
       }
 
       const data = await response.json();
@@ -210,7 +231,28 @@ class ApiService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        
+        // Manejar errores específicos de autenticación
+        if (response.status === 401) {
+          throw new Error('Credenciales incorrectas');
+        } else if (response.status === 400) {
+          // Intentar parsear el error para obtener un mensaje más específico
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.message) {
+              throw new Error(errorData.message);
+            }
+          } catch (parseError) {
+            // Si no se puede parsear, usar el texto original
+          }
+          throw new Error('Datos de entrada incorrectos');
+        } else if (response.status === 500) {
+          throw new Error('Error interno del servidor');
+        } else if (response.status >= 500) {
+          throw new Error('Error del servidor. Inténtelo más tarde');
+        } else {
+          throw new Error(`Error del servidor: ${response.status}`);
+        }
       }
 
       const responseData = await response.json();

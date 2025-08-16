@@ -141,6 +141,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userPreview: loginData.user ? loginData.user.email || loginData.user.correo : 'No user'
       });
       
+      // Validar que tenemos datos mínimos necesarios
+      if (!loginData.user) {
+        throw new Error('No se recibieron datos del usuario');
+      }
+      
       // Validar y normalizar los datos del usuario
       const normalizedUser: User = {
         id: loginData.user.id || loginData.user.userId || 0,
@@ -161,6 +166,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await AsyncStorage.setItem('auth_token', loginData.token);
       } else {
         console.log('WARNING: No token provided in login data');
+        // No lanzar error aquí, algunos flujos pueden no requerir token inmediatamente
       }
 
       // Guardar password temporalmente para renovación automática (solo para desarrollo)
@@ -186,10 +192,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log('AuthContext login completed successfully');
       console.log('==============================');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving login data:', error);
       // En caso de error, asegurar que el estado sea consistente
       setUser(null);
+      
+      // Limpiar datos corruptos si los hay
+      try {
+        await AsyncStorage.multiRemove(['auth_token', 'user_data', 'temp_password']);
+      } catch (cleanupError) {
+        console.error('Error cleaning up auth data:', cleanupError);
+      }
+      
+      // Re-lanzar el error para que la UI pueda manejarlo
+      throw new Error(error.message || 'Error al guardar datos de autenticación');
     }
   };
 
