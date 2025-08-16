@@ -66,9 +66,6 @@ export interface FumigationData {
   supplies: Supply[];
   
   observations: string;
-  
-  technicianSignature: string;
-  clientSignature: string;
 }
 
 export interface ValidationErrors {
@@ -136,9 +133,7 @@ export const useFumigationEvidence = (fumigationDetails: FumigationDetailRespons
       hitDanger: false
     },
     supplies: [],
-    observations: "",
-    technicianSignature: "",
-    clientSignature: ""
+    observations: ""
   });
 
   useEffect(() => {
@@ -300,9 +295,7 @@ export const useFumigationEvidence = (fumigationDetails: FumigationDetailRespons
         hitDanger: false
       },
       supplies: [],
-      observations: "",
-      technicianSignature: "",
-      clientSignature: ""
+          observations: ""
     };
 
     if (fumigationDetails) {

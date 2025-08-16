@@ -77,9 +77,7 @@ export const UncoveringForm: React.FC<UncoveringFormProps> = ({
       hitDanger: cleanupData.industrialSafetyConditions.hitDanger,
       otherDanger: cleanupData.industrialSafetyConditions.otherDanger
     },
-    observations: "",
-    technicianSignature: cleanupData.technicianSignature || "",
-    clientSignature: cleanupData.clientSignature || ""
+    observations: ""
   };
 
   const updateFumigationField = (field: any, value: any) => {
@@ -156,13 +154,7 @@ export const UncoveringForm: React.FC<UncoveringFormProps> = ({
     }
   };
 
-  const handleTechnicianSignatureChange = (signature: string) => {
-    updateField('technicianSignature', signature);
-  };
 
-  const handleClientSignatureChange = (signature: string) => {
-    updateField('clientSignature', signature);
-  };
 
   const ValidationErrorList = ({ errors }: { errors: CleanupValidationErrors }) => {
     const errorMessages = Object.values(errors).filter(Boolean);
@@ -218,14 +210,7 @@ export const UncoveringForm: React.FC<UncoveringFormProps> = ({
         mode="cleanup"
       />
 
-      <SignaturesSection 
-        isEditable={isEditable}
-        fumigationReportSubmitted={cleanupReportSubmitted}
-        technicianSignature={cleanupData.technicianSignature}
-        clientSignature={cleanupData.clientSignature}
-        onTechnicianSignatureChange={handleTechnicianSignatureChange}
-        onClientSignatureChange={handleClientSignatureChange}
-      />
+
     </ScrollView>
   );
 };

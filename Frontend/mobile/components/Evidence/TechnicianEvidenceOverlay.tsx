@@ -12,8 +12,10 @@ import {
 import { FumigationDetailResponse, ApiUser } from '@/types/request';
 import { usersService } from '@/services/usersService';
 import { reportsService } from '@/services/reportsService';
+import { signatureService } from '@/services/signatureService';
 import { FumigationForm } from './FumigationForm';
 import { UncoveringForm } from './UncoveringForm';
+import { SignatureConfirmationModal } from '../SignatureConfirmationModal';
 import { useFumigationEvidence } from '@/hooks/useFumigationEvidence';
 import { useUncoveringEvidence } from '@/hooks/useUncoveringEvidence';
 
@@ -37,10 +39,11 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
   loading = false
 }) => {
   const [availableTechnicians, setAvailableTechnicians] = useState<ApiUser[]>([]);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showSignatureConfirmation, setShowSignatureConfirmation] = useState(false);
   const [fumigationReportSubmitted, setFumigationReportSubmitted] = useState(false);
   const [cleanupReportSubmitted, setCleanupReportSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reportId, setReportId] = useState<number | null>(null);
   
   const {
     fumigationData,
@@ -116,28 +119,21 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
       console.log('Cleanup form validation passed');
     }
     
-    console.log('Setting show confirm dialog to true');
-    setShowConfirmDialog(true);
+    console.log('Setting show signature confirmation to true');
+    setShowSignatureConfirmation(true);
   };
 
-  const handleSubmitFumigationReport = async () => {
-    console.log('=== HANDLE SUBMIT FUMIGATION REPORT START ===');
-    console.log('Is submitting:', isSubmitting);
-    
-    if (isSubmitting) {
-      console.log('Already submitting, returning');
-      return;
-    }
-    
-    console.log('Setting is submitting to true');
-    setIsSubmitting(true);
+  const createReport = async () => {
+    const formatDateForBackend = (dateString: string) => {
+      const [year, month, day] = dateString.split('-');
+      return `${day}-${month}-${year}`;
+    };
 
-    try {
-      const formatDateForBackend = (dateString: string) => {
-        const [year, month, day] = dateString.split('-');
-        return `${day}-${month}-${year}`;
-      };
+    console.log("=== CREATING REPORT ===");
+    console.log("Fumigation Details:", fumigationDetails);
+    console.log("Lot ID being sent:", fumigationDetails?.lot.id);
 
+    if (fumigationStatus === "APPROVED") {
       const reportData = {
         id: fumigationDetails?.lot?.id || 0,
         location: fumigationData.location.trim(),
@@ -167,64 +163,13 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
           fallingDanger: fumigationData.hazards.fallingDanger,
           hitDanger: fumigationData.hazards.hitDanger
         },
-        observations: fumigationData.observations.trim() || "",
-        signatures: {
-          technician: fumigationData.technicianSignature,
-          client: fumigationData.clientSignature
-        }
+        observations: fumigationData.observations.trim() || ""
       };
 
-      console.log('=== SUBMITTING FUMIGATION REPORT ===');
-      console.log('Report data to submit:', JSON.stringify(reportData, null, 2));
-      
-      const result = await reportsService.createFumigationReport(reportData);
-      console.log('Report submission result:', result);
-      
-      setFumigationReportSubmitted(true);
-      setShowConfirmDialog(false);
-      
-      // Call onSave immediately after successful submission
-      onSave?.(reportData);
-      
-      Alert.alert(
-        'Éxito',
-        'El registro de fumigación ha sido enviado correctamente.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              onClose?.();
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error("Error submitting fumigation report:", error);
-      Alert.alert('Error', 'No se pudo enviar el registro. Inténtelo nuevamente.');
-    } finally {
-      console.log('Setting is submitting to false');
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitCleanupReport = async () => {
-    console.log('=== HANDLE SUBMIT CLEANUP REPORT START ===');
-    console.log('Is submitting:', isSubmitting);
-    
-    if (isSubmitting) {
-      console.log('Already submitting, returning');
-      return;
-    }
-    
-    console.log('Setting is submitting to true');
-    setIsSubmitting(true);
-
-    try {
-      const formatDateForBackend = (dateString: string) => {
-        const [year, month, day] = dateString.split('-');
-        return `${day}-${month}-${year}`;
-      };
-
+      console.log("Report data being sent:", reportData);
+      await reportsService.createFumigationReport(reportData);
+      return reportData;
+    } else {
       const reportData = {
         id: fumigationDetails?.lot?.id || 0,
         date: formatDateForBackend(cleanupData.date),
@@ -242,28 +187,59 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
           fallingDanger: cleanupData.industrialSafetyConditions.fallingDanger,
           hitDanger: cleanupData.industrialSafetyConditions.hitDanger,
           otherDanger: cleanupData.industrialSafetyConditions.otherDanger
-        },
-        signatures: {
-          technician: cleanupData.technicianSignature,
-          client: cleanupData.clientSignature
         }
       };
 
-      console.log('=== SUBMITTING CLEANUP REPORT ===');
-      console.log('Report data to submit:', JSON.stringify(reportData, null, 2));
+      await reportsService.createCleanupReport(reportData);
+      return reportData;
+    }
+  };
+
+  const handleSignatureConfirmation = async (technicianSignature: string, clientSignature: string) => {
+    setIsSubmitting(true);
+    
+    try {
+      console.log("🔄 Iniciando proceso completo...");
       
-      const result = await reportsService.createCleanupReport(reportData);
-      console.log('Report submission result:', result);
+      const reportData = await createReport();
+      console.log("✅ Reporte creado exitosamente");
+
+      const createdReport = fumigationStatus === "APPROVED" 
+        ? await reportsService.getFumigationReport(fumigationDetails?.lot.id || 0)
+        : await reportsService.getCleanupReport(fumigationDetails?.lot.id || 0);
       
-      setCleanupReportSubmitted(true);
-      setShowConfirmDialog(false);
-      
-      // Call onSave immediately after successful submission
-      onSave?.(reportData);
+      console.log("📝 Subiendo firmas para reporte ID:", createdReport.id);
+
+      await signatureService.uploadSignature({
+        fumigationId: fumigationStatus === "APPROVED" ? createdReport.id : null,
+        cleanupId: fumigationStatus === "FUMIGATED" ? createdReport.id : null,
+        signatureType: 'technician',
+        signatureData: technicianSignature
+      });
+      console.log("✅ Firma del técnico subida");
+
+      await signatureService.uploadSignature({
+        fumigationId: fumigationStatus === "APPROVED" ? createdReport.id : null,
+        cleanupId: fumigationStatus === "FUMIGATED" ? createdReport.id : null,
+        signatureType: 'client',
+        signatureData: clientSignature
+      });
+      console.log("✅ Firma del cliente subida");
+
+      if (fumigationStatus === "APPROVED") {
+        setFumigationReportSubmitted(true);
+      } else {
+        setCleanupReportSubmitted(true);
+      }
+
+      setShowSignatureConfirmation(false);
+      onSave?.({});
       
       Alert.alert(
         'Éxito',
-        'El registro de descarpe ha sido enviado correctamente.',
+        fumigationStatus === "APPROVED" 
+          ? 'El registro de fumigación ha sido enviado correctamente.'
+          : 'El registro de descarpe ha sido enviado correctamente.',
         [
           {
             text: 'OK',
@@ -274,24 +250,10 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
         ]
       );
     } catch (error) {
-      console.error("Error submitting cleanup report:", error);
-      Alert.alert('Error', 'No se pudo enviar el registro. Inténtelo nuevamente.');
+      console.error("❌ Error en el proceso:", error);
+      Alert.alert('Error', `Error al procesar el registro: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
-      console.log('Setting is submitting to false');
       setIsSubmitting(false);
-    }
-  };
-
-  const handleConfirmSubmit = () => {
-    console.log('=== HANDLE CONFIRM SUBMIT ===');
-    console.log('Fumigation status:', fumigationStatus);
-    
-    if (fumigationStatus === "APPROVED") {
-      console.log('Calling handleSubmitFumigationReport');
-      handleSubmitFumigationReport();
-    } else {
-      console.log('Calling handleSubmitCleanupReport');
-      handleSubmitCleanupReport();
     }
   };
 
@@ -426,42 +388,17 @@ export const TechnicianEvidenceOverlay: React.FC<TechnicianEvidenceOverlayProps>
           )}
         </View>
 
-        {/* Confirmation Dialog */}
-        {showConfirmDialog && (
-          <Modal
-            visible={showConfirmDialog}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowConfirmDialog(false)}
-          >
-            <View style={styles.confirmOverlay}>
-              <View style={styles.confirmDialog}>
-                <Text style={styles.confirmTitle}>Confirmar envío</Text>
-                <Text style={styles.confirmMessage}>
-                  ¿Estás seguro de que deseas enviar este registro? Esta acción no se puede deshacer.
-                </Text>
-                <View style={styles.confirmButtons}>
-                  <TouchableOpacity
-                    style={[styles.confirmButton, styles.confirmCancelButton]}
-                    onPress={() => setShowConfirmDialog(false)}
-                    disabled={isSubmitting}
-                  >
-                    <Text style={styles.confirmCancelButtonText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.confirmButton, styles.confirmSubmitButton, { backgroundColor: getButtonColor() }]}
-                    onPress={handleConfirmSubmit}
-                    disabled={isSubmitting}
-                  >
-                    <Text style={styles.confirmSubmitButtonText}>
-                      {isSubmitting ? "Enviando..." : "Confirmar"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        )}
+        <SignatureConfirmationModal
+          isOpen={showSignatureConfirmation}
+          onClose={() => {
+            if (!isSubmitting) {
+              setShowSignatureConfirmation(false);
+            }
+          }}
+          onConfirm={handleSignatureConfirmation}
+          isSubmitting={isSubmitting}
+          reportType={fumigationStatus === "APPROVED" ? 'fumigation' : 'cleanup'}
+        />
       </View>
     </Modal>
   );
@@ -553,60 +490,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  confirmDialog: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
-    width: '80%',
-    maxWidth: 400,
-  },
-  confirmTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  confirmMessage: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 24,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  confirmButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  confirmCancelButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  confirmCancelButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmSubmitButton: {
-    backgroundColor: '#003595',
-  },
-  confirmSubmitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+
 });

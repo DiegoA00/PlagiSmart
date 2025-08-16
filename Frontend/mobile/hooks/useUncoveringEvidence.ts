@@ -28,8 +28,6 @@ export interface CleanupData {
   technicians: CleanupTechnician[];
   lotDescription: CleanupLotDescription;
   industrialSafetyConditions: CleanupIndustrialSafetyConditions;
-  technicianSignature: string;
-  clientSignature: string;
 }
 
 export interface CleanupValidationErrors {
@@ -71,8 +69,7 @@ export const useUncoveringEvidence = (fumigationDetails: FumigationDetailRespons
       hitDanger: false,
       otherDanger: false
     },
-    technicianSignature: "",
-    clientSignature: ""
+
   });
 
   useEffect(() => {
@@ -199,8 +196,7 @@ export const useUncoveringEvidence = (fumigationDetails: FumigationDetailRespons
         hitDanger: false,
         otherDanger: false
       },
-      technicianSignature: "",
-      clientSignature: ""
+
     };
 
     setCleanupData(initialData);

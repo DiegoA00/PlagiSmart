@@ -39,13 +39,7 @@ export const FumigationForm: React.FC<FumigationFormProps> = ({
   addToArray,
   removeFromArray
 }) => {
-  const handleTechnicianSignatureChange = (signature: string) => {
-    updateField('technicianSignature', signature);
-  };
 
-  const handleClientSignatureChange = (signature: string) => {
-    updateField('clientSignature', signature);
-  };
 
   const ValidationErrorList = ({ errors }: { errors: ValidationErrors }) => {
     const errorMessages = Object.values(errors).filter(Boolean);
@@ -128,14 +122,7 @@ export const FumigationForm: React.FC<FumigationFormProps> = ({
         fumigationReportSubmitted={fumigationReportSubmitted}
       />
 
-      <SignaturesSection 
-        isEditable={isEditable}
-        fumigationReportSubmitted={fumigationReportSubmitted}
-        technicianSignature={fumigationData.technicianSignature}
-        clientSignature={fumigationData.clientSignature}
-        onTechnicianSignatureChange={handleTechnicianSignatureChange}
-        onClientSignatureChange={handleClientSignatureChange}
-      />
+
     </ScrollView>
   );
 };

@@ -31,10 +31,6 @@ interface FumigationReportRequest {
   };
   observations: string;
   supervisor: string;
-  signatures: {
-    technician: string;
-    client: string;
-  };
 }
 
 interface CleanupReportRequest {
@@ -55,10 +51,6 @@ interface CleanupReportRequest {
     otherDanger: boolean;
   };
   supervisor: string;
-  signatures: {
-    technician: string;
-    client: string;
-  };
 }
 
 interface ApiResponse {
